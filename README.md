@@ -1,53 +1,73 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H21 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# Monitoramento Ambiental — Caso de Uso 2
 
-# Hello World Example
+Firmware desenvolvido com **ESP-IDF** para aquisição de variáveis ambientais usando ESP32 e sensores conectados ao sistema de monitoramento do segundo caso de uso do TCC no IF Goiano – Campus Urutaí.
 
-Starts a FreeRTOS task to print "Hello World".
+## Objetivo
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+Coletar medições ambientais em um ambiente de criação de suínos e encaminhá-las por MQTT para que a aplicação de backend possa receber e armazenar os dados para consulta e análise.
 
-## How to use example
+## Sensores
 
-Follow detailed instructions provided specifically for this example.
+A montagem descrita para este caso de uso contempla:
 
-Select the instructions depending on Espressif chip installed on your development board:
+| Sensor | Informação | Observações |
+|---|---|---|
+| DHT22 / AM2301 | Temperatura e umidade relativa do ar | Comunicação digital; GPIO 21 na configuração documentada |
+| MQ-135 | Sinal relacionado à qualidade do ar | Saída analógica conectada ao GPIO 34 (ADC1_CH6); conversão em concentração depende da calibração |
+| LDR | Intensidade luminosa relativa | Leitura analógica usada como indicação de luminosidade |
 
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+As leituras do MQ-135 não devem ser tratadas como medição laboratorial precisa de um gás específico sem calibração e validação adequadas. O LDR também fornece uma indicação relativa, salvo se houver calibração fotométrica.
 
+## Fluxo de funcionamento
 
-## Example folder contents
+1. O ESP32 inicializa os periféricos e os drivers dos sensores.
+2. Lê as variáveis ambientais disponíveis.
+3. Conecta-se à rede Wi-Fi.
+4. Publica os dados no broker MQTT, usando o tópico `ambientedata` na configuração documentada.
+5. A aplicação consumidora recebe as mensagens e pode encaminhá-las aos bancos de dados usados pelo sistema.
 
-The project **hello_world** contains one source file in C language [hello_world_main.c](main/hello_world_main.c). The file is located in folder [main](main).
+## Comunicação
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
+- **Microcontrolador:** ESP32
+- **Framework:** ESP-IDF
+- **Transporte:** Wi-Fi
+- **Mensageria:** MQTT
+- **Tópico de medições:** `ambientedata`
 
-Below is short explanation of remaining files in the project folder.
+O formato exato do JSON deve ser conferido no código do firmware e mantido em sincronia com a aplicação que consome as mensagens.
 
+## Requisitos
+
+- Placa ESP32
+- Sensores DHT22/AM2301, MQ-135 e LDR conforme a montagem utilizada
+- ESP-IDF instalado e configurado
+- Rede Wi-Fi e broker MQTT acessíveis
+- Ligações elétricas e alimentação compatíveis com os sensores
+
+## Configuração
+
+Revise as credenciais Wi-Fi, o endereço e a porta do broker MQTT e os parâmetros de leitura dos sensores antes de executar o firmware. Mantenha credenciais privadas fora do controle de versão.
+
+Verifique também se os GPIOs definidos no código correspondem à montagem física. No ESP32, entradas ADC não toleram tensões acima do limite elétrico do chip; use o circuito de condicionamento apropriado.
+
+## Compilação e gravação
+
+Em um terminal configurado com ESP-IDF, na raiz do projeto:
+
+```bash
+idf.py set-target esp32
+idf.py build
+idf.py -p PORTA flash monitor
 ```
-├── CMakeLists.txt
-├── pytest_hello_world.py      Python script used for automated testing
-├── main
-│   ├── CMakeLists.txt
-│   └── hello_world_main.c
-└── README.md                  This is the file you are currently reading
-```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
+Substitua `PORTA` pela porta serial da placa. Se o alvo já estiver configurado, não é necessário defini-lo novamente.
 
-## Troubleshooting
+## Papel no TCC
 
-* Program upload failure
+Este firmware realiza a aquisição no caso de uso de monitoramento ambiental. As mensagens MQTT formam a entrada da cadeia de processamento, que integra dispositivos IoT, uma aplicação de backend e os mecanismos de armazenamento do projeto.
 
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
+## Limitações
 
-## Technical support and feedback
-
-Please use the following feedback channels:
-
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
-
-We will get back to you as soon as possible.
+- A qualidade das medições depende do sensor, das condições físicas e da calibração.
+- A estimativa de concentração a partir do MQ-135 depende de aquecimento, calibração e condições ambientais.
+- A disponibilidade de envio depende da rede Wi-Fi e do broker MQTT.
