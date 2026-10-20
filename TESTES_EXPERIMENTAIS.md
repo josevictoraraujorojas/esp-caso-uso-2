@@ -1,22 +1,46 @@
 # Procedimento experimental — monitoramento ambiental
 
-## Objetivo
-Validar os payloads publicados pelo ESP32 com sensores ambientais antes de avaliar a persistência no backend.
+Este procedimento acompanha as leituras dos sensores do Caso de Uso 2, desde a publicação MQTT pelo ESP32 até o recebimento e a persistência no backend.
 
-## Execução
-Compile e grave o firmware, conecte os sensores de acordo com a montagem real e aguarde o aquecimento/calibração previsto no firmware. Capture o tópico de medições:
+## 1. Observar o ESP32
 
-    mosquitto_sub -h HOST_DO_BROKER -p 1883 -t ambientedata > captura.jsonl
+No terminal ESP-IDF, com o dispositivo conectado:
 
-Encerre a captura com Ctrl+C e execute:
+```powershell
+idf.py -p COM5 monitor
+```
 
-    py tests\validar_experimento.py --autoteste
-    py tests\validar_experimento.py --arquivo captura.jsonl --saida resultado.json
+Troque `COM5` pela porta serial correta. Depois do período de aquecimento e calibração implementado no firmware, procure as linhas:
 
-O script verifica valor, campo, sensor e esp32Mac. Os valores campo aceitos são temperatura, umidade e qualidade_ar, associados respectivamente aos sensores dht22, dht22 e mq135. Mensagens de erro do DHT são relatadas como falhas.
+```text
+[EXPERIMENTO][MQTT_ENVIO] topico=ambientedata mensagem_id=... payload={...}
+```
 
-## Protocolo sugerido
-Realize cinco repetições, anotando início/fim, mensagens recebidas, mensagens válidas e eventuais falhas. Sempre registre condições relevantes de ambiente e calibração. Não interprete o valor calculado pelo MQ-135 como concentração laboratorialmente precisa sem calibração independente.
+São publicadas mensagens separadas para temperatura, umidade e qualidade do ar. Registre cada payload e os eventuais erros indicados por `[EXPERIMENTO][MQTT_ENVIO_FALHA]`.
 
-## Limitação
-O validador não comprova a exatidão metrológica dos sensores nem testa fisicamente os GPIOs. Ele analisa apenas as mensagens capturadas no broker.
+## 2. Conferir o broker MQTT
+
+Em outro terminal:
+
+```powershell
+mosquitto_sub -h HOST_DO_BROKER -p 1883 -t ambientedata -v
+```
+
+Substitua o host pelo endereço do broker usado no firmware. Compare os payloads exibidos pelo broker com os logs do ESP32.
+
+## 3. Conferir o backend e o InfluxDB
+
+No console Java do backend do Caso de Uso 2, procure estas marcas:
+
+- `[EXPERIMENTO][MQTT_RECEBIDO]`: payload e tópico recebidos;
+- `[EXPERIMENTO][INFLUX_INICIO]`: início da escrita no measurement `medicoes_ambientais`;
+- `[EXPERIMENTO][INFLUX_PERSISTIDO]`: escrita retornou sem erro e registra valor, timestamp e IDs associados;
+- `[EXPERIMENTO][FALHA_PROCESSAMENTO]` e `[EXPERIMENTO][INFLUX_FALHA]`: indicam problemas.
+
+No InfluxDB Data Explorer, selecione o bucket `caso_uso_2`, measurement `medicoes_ambientais` e o intervalo observado. Confirme que os registros podem ser recuperados.
+
+O Neo4j armazena informações de contexto e eventos ambientais conforme as regras da aplicação. Um evento ambiental é gravado quando os limites são ultrapassados e ainda não existe evento ativo equivalente; portanto, não se espera um evento novo para cada medição.
+
+## Dados a registrar
+
+Faça repetições sob condições registradas. Para cada uma, anote o período, as mensagens emitidas e recebidas, os registros persistidos e as falhas. A leitura do MQ-135 é uma estimativa dependente da calibração, não uma medição laboratorial de concentração sem validação independente.
