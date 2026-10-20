@@ -71,3 +71,50 @@ Este firmware realiza a aquisição no caso de uso de monitoramento ambiental. A
 - A qualidade das medições depende do sensor, das condições físicas e da calibração.
 - A estimativa de concentração a partir do MQ-135 depende de aquecimento, calibração e condições ambientais.
 - A disponibilidade de envio depende da rede Wi-Fi e do broker MQTT.
+
+## Testes experimentais do TCC
+
+### Objetivo e fluxo avaliado
+
+Verificar a leitura dos sensores ambientais e a publicação das mensagens pelo tópico MQTT `ambientedata`, acompanhando a cadeia até o backend do [Caso de Uso 2](https://github.com/josevictoraraujorojas/caso-de-uso-2) e a persistência em InfluxDB. A leitura do MQ-135 é dependente da calibração; não deve ser interpretada como medição laboratorial precisa sem validação.
+
+### Preparação
+
+1. Confira os sensores, GPIOs, alimentação e as credenciais Wi-Fi.
+2. Configure o endereço/porta do broker MQTT no firmware.
+3. Inicie o broker, InfluxDB, Neo4j e backend do Caso de Uso 2.
+4. Identifique a porta serial do ESP32.
+
+### Execução e coleta dos logs
+
+Crie a pasta de resultados se necessário: `New-Item -ItemType Directory -Force -Path "$HOME\TCC-Experimentos"`. No terminal ESP-IDF, na raiz do projeto:
+
+```powershell
+idf.py build
+idf.py -p COM5 flash
+Start-Transcript -Path "$HOME\TCC-Experimentos\04-ambiental-serial.log"
+idf.py -p COM5 monitor
+```
+
+Substitua `COM5` pela porta correta. Encerre o monitor com `Ctrl+]` e finalize a transcrição com `Stop-Transcript` quando retornar ao prompt. Em outro terminal, observe o tópico MQTT:
+
+```powershell
+mosquitto_sub -h HOST_DO_BROKER -p 1883 -t ambientedata -v |
+  Tee-Object -FilePath "$HOME\TCC-Experimentos\07-mqtt-ambiental.log"
+```
+
+Substitua o host pelo endereço real. Inicie o assinante antes do firmware e aguarde o marcador `[EXPERIMENTO][FIM]`.
+
+### Como o teste foi instrumentado
+
+Os logs do firmware usam marcadores com o prefixo `[EXPERIMENTO]` para acompanhar publicação, contagem e encerramento. O limite experimental é de até 100 mensagens de dados publicadas em `ambientedata`; isso não equivale necessariamente a 100 ciclos completos de leitura dos sensores, pois um ciclo pode gerar mais de uma mensagem. O retorno local do cliente MQTT não garante que o broker recebeu cada mensagem.
+
+### Verificação e interpretação
+
+- Compare contagem e erros do firmware com as mensagens observadas pelo assinante MQTT.
+- No backend, procure `[EXPERIMENTO][MQTT_RECEBIDO]`, `[EXPERIMENTO][INFLUX_INICIO]`, `[EXPERIMENTO][INFLUX_PERSISTIDO]` e marcadores de falha.
+- Consulte o bucket `caso_uso_2`, medição `medicoes_ambientais`, no InfluxDB, limitando a consulta ao intervalo da execução.
+- Confira no Neo4j apenas os eventos e relacionamentos esperados para o cenário e para a lógica implementada; não presuma que cada leitura gere um evento no grafo.
+- Registre mensagens publicadas, recebidas pelo broker/backend, registros encontrados e falhas.
+
+A persistência deve ser confirmada com consulta ao banco. Registre as condições do ambiente e use um arquivo diferente para cada repetição.
