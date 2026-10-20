@@ -48,7 +48,7 @@ Faça repetições sob condições registradas. Para cada uma, anote o período,
 
 ## Limite do ensaio e salvamento dos logs
 
-O firmware limita o ensaio a 100 mensagens experimentais no fluxo indicado abaixo. Ao alcançar o limite, registra `[EXPERIMENTO][FIM]` e impede novas mensagens experimentais desse fluxo. No sniffer, a unidade é a mensagem JSON enviada pela UART; no receptor, são as mensagens publicadas no tópico `wifi`. O contador local não prova que todas as mensagens chegaram ao broker ou foram persistidas.
+O firmware ambiental limita o ensaio a 100 publicações de dados no tópico `ambientedata`. Temperatura, umidade e qualidade do ar são mensagens separadas, portanto 100 publicações não equivalem a 100 ciclos completos dos três sensores. Ao alcançar o limite, registra `[EXPERIMENTO][FIM]` e encerra a tarefa de publicação. O contador local não prova que todas as mensagens chegaram ao broker ou foram persistidas.
 
 Para gravar a saída serial em um arquivo no computador, abra o PowerShell na pasta do projeto e execute (ajuste a porta serial conforme necessário):
 
