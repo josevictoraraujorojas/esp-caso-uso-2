@@ -39,7 +39,7 @@ O formato exato do JSON deve ser conferido no código do firmware e mantido em s
 ## Requisitos
 
 - Placa ESP32
-- Sensores DHT22/AM2301, MQ-135 e LDR conforme a montagem utilizada
+- Sensores DHT22/AM2301, MQ-135 conforme a montagem utilizada
 - ESP-IDF instalado e configurado
 - Rede Wi-Fi e broker MQTT acessíveis
 - Ligações elétricas e alimentação compatíveis com os sensores
