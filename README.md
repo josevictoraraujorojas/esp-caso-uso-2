@@ -92,8 +92,7 @@ Crie a pasta de resultados se necessário: `New-Item -ItemType Directory -Force 
 ```powershell
 idf.py build
 idf.py -p COM5 flash
-Start-Transcript -Path "$HOME\TCC-Experimentos\04-ambiental-serial.log"
-idf.py -p COM5 monitor
+idf.py -p COM5 monitor 2>&1 | Tee-Object -FilePath "C:\Users\Jose\TCC-Experimentos\01-pzem-serial.log"
 ```
 
 Substitua `COM5` pela porta correta. Encerre o monitor com `Ctrl+]` e finalize a transcrição com `Stop-Transcript` quando retornar ao prompt. Em outro terminal, observe o tópico MQTT:
