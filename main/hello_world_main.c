@@ -20,7 +20,7 @@
 #define WIFI_PASS "jr131415"
 
 /* MQTT */
-#define MQTT_BROKER_URI "mqtt://192.168.0.118:1883"
+#define MQTT_BROKER_URI "mqtt://192.168.0.115:1883"
 #define MQTT_TOPIC_DADOS "ambientedata"
 #define MQTT_TOPIC_DISPOSITIVO "esp32"
 

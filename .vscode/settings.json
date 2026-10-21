@@ -15,5 +15,6 @@
   ],
   "idf.portWin": "COM3",
   "idf.flashType": "UART",
-  "git.ignoreLimitWarning": true
+  "git.ignoreLimitWarning": true,
+  "idf.port": "COM7"
 }
