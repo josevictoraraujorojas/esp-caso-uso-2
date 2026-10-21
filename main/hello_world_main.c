@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <string.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -11,9 +12,12 @@
 #include "esp_event.h"
 #include "esp_wifi.h"
 #include "esp_mac.h"
+#include "esp_log.h"
 #include "mqtt_client.h"
 #include "dht.h"
 #include "driver/adc.h"
+
+static const char *TAG = "SENSOR_AMBIENTAL";
 
 /* Wi-Fi */
 #define WIFI_SSID "Rojas_wgo_fibra"
@@ -23,6 +27,7 @@
 #define MQTT_BROKER_URI "mqtt://192.168.0.118:1883"
 #define MQTT_TOPIC_DADOS "ambientedata"
 #define MQTT_TOPIC_DISPOSITIVO "esp32"
+#define TOTAL_MENSAGENS_TESTE 100
 
 /* DHT22 */
 #define DHT_GPIO GPIO_NUM_21
@@ -40,6 +45,55 @@ static float R0 = 0;
 
 /* Cliente MQTT */
 static esp_mqtt_client_handle_t mqtt_client = NULL;
+static int mensagens_dados_publicadas = 0;
+
+/* Registra a tentativa e o resultado local da publicação MQTT. */
+static int publicar_mensagem_experimental(
+    esp_mqtt_client_handle_t cliente,
+    const char *topico,
+    const char *payload,
+    int qos
+)
+{
+    if (cliente == NULL || topico == NULL || payload == NULL)
+    {
+        ESP_LOGE(TAG, "[EXPERIMENTO][MQTT_ENVIO_FALHA] cliente, topico ou payload nulo");
+        return -1;
+    }
+
+    if (strcmp(topico, MQTT_TOPIC_DADOS) == 0 &&
+        mensagens_dados_publicadas >= TOTAL_MENSAGENS_TESTE)
+    {
+        return -2;
+    }
+
+    int mensagem_id = esp_mqtt_client_publish(
+        cliente, topico, payload, 0, qos, 0
+    );
+
+    if (mensagem_id < 0)
+    {
+        ESP_LOGE(TAG, "[EXPERIMENTO][MQTT_ENVIO_FALHA] topico=%s payload=%s",
+                 topico, payload);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "[EXPERIMENTO][MQTT_ENVIO] topico=%s mensagem_id=%d qos=%d payload=%s",
+                 topico, mensagem_id, qos, payload);
+    }
+
+    if (mensagem_id >= 0 && strcmp(topico, MQTT_TOPIC_DADOS) == 0)
+    {
+        mensagens_dados_publicadas++;
+        ESP_LOGI(TAG, "[EXPERIMENTO][CONTAGEM] mensagens=%d/%d",
+                 mensagens_dados_publicadas, TOTAL_MENSAGENS_TESTE);
+        if (mensagens_dados_publicadas == TOTAL_MENSAGENS_TESTE)
+            ESP_LOGI(TAG, "[EXPERIMENTO][FIM] total_mensagens=%d", mensagens_dados_publicadas);
+    }
+
+    return mensagem_id;
+}
+
 
 
 /* =========================================================
@@ -107,7 +161,7 @@ static void mqtt_task(void *pvParameters)
 
     calibrar_sensor();
 
-    while (1)
+    while (mensagens_dados_publicadas < TOTAL_MENSAGENS_TESTE)
     {
         if (mqtt_client != NULL)
         {
@@ -155,34 +209,13 @@ static void mqtt_task(void *pvParameters)
                 );
 
                 /* Publica temperatura. */
-                esp_mqtt_client_publish(
-                    mqtt_client,
-                    MQTT_TOPIC_DADOS,
-                    msg_temp,
-                    0,
-                    0,
-                    0
-                );
+                publicar_mensagem_experimental(mqtt_client, MQTT_TOPIC_DADOS, msg_temp, 0);
 
                 /* Publica umidade. */
-                esp_mqtt_client_publish(
-                    mqtt_client,
-                    MQTT_TOPIC_DADOS,
-                    msg_umid,
-                    0,
-                    0,
-                    0
-                );
+                publicar_mensagem_experimental(mqtt_client, MQTT_TOPIC_DADOS, msg_umid, 0);
 
                 /* Publica qualidade do ar. */
-                esp_mqtt_client_publish(
-                    mqtt_client,
-                    MQTT_TOPIC_DADOS,
-                    msg_ar,
-                    0,
-                    0,
-                    0
-                );
+                publicar_mensagem_experimental(mqtt_client, MQTT_TOPIC_DADOS, msg_ar, 0);
             }
             else
             {
@@ -195,19 +228,15 @@ static void mqtt_task(void *pvParameters)
                     device_id
                 );
 
-                esp_mqtt_client_publish(
-                    mqtt_client,
-                    MQTT_TOPIC_DADOS,
-                    erro,
-                    0,
-                    0,
-                    0
-                );
+                publicar_mensagem_experimental(mqtt_client, MQTT_TOPIC_DADOS, erro, 0);
             }
         }
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
+
+    ESP_LOGI(TAG, "[EXPERIMENTO][TAREFA_ENCERRADA] total_mensagens=%d", mensagens_dados_publicadas);
+    vTaskDelete(NULL);
 }
 
 
@@ -247,14 +276,7 @@ static void mqtt_event_handler(
                 device_id
             );
 
-            esp_mqtt_client_publish(
-                mqtt_client,
-                MQTT_TOPIC_DISPOSITIVO,
-                mensagem,
-                0,
-                0,
-                0
-            );
+            publicar_mensagem_experimental(mqtt_client, MQTT_TOPIC_DISPOSITIVO, mensagem, 0);
 
             xTaskCreate(
                 mqtt_task,
@@ -340,6 +362,7 @@ static void wifi_event_handler(
 
 void app_main(void)
 {
+    ESP_LOGI(TAG, "[EXPERIMENTO][INICIO] inicializando sensores ambientais");
     uint8_t mac[6];
 
     ESP_ERROR_CHECK(
