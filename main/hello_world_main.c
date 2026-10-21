@@ -16,6 +16,7 @@
 #include "mqtt_client.h"
 #include "dht.h"
 #include "driver/adc.h"
+#include "mq135.h"
 
 static const char *TAG = "SENSOR_AMBIENTAL";
 
@@ -34,7 +35,7 @@ static const char *TAG = "SENSOR_AMBIENTAL";
 
 /* MQ135 */
 #define MQ135_ADC_CHANNEL ADC1_CHANNEL_6
-#define RL 10.0
+#define RL 10.0f
 
 /* Identificacao do dispositivo */
 static char device_id[20];
@@ -102,12 +103,11 @@ static int publicar_mensagem_experimental(
 
 static float calcular_rs(int raw)
 {
-    if (raw <= 0)
-    {
-        raw = 1;
-    }
-
-    return ((4095.0 / raw) - 1.0) * RL;
+    return mq135_calculate_resistance(
+        raw,
+        MQ135_ADC_MAX_12_BIT,
+        RL
+    );
 }
 
 
@@ -131,7 +131,10 @@ static void calibrar_sensor(void)
 
     rs /= amostras;
 
-    R0 = rs / 3.6;
+    R0 = mq135_calibrate_r0(
+        rs,
+        MQ135_CLEAN_AIR_RATIO
+    );
 }
 
 
@@ -175,10 +178,12 @@ static void mqtt_task(void *pvParameters)
                 int raw = adc1_get_raw(MQ135_ADC_CHANNEL);
 
                 float rs = calcular_rs(raw);
-                float ratio = rs / R0;
 
-                float ppm = 116.6020682 * pow(ratio, -2.769034857);
-                ppm *= 100;
+                float ppm = mq135_estimate_co2_ppm(rs, R0);
+                if (!isfinite(ppm))
+                {
+                    ppm = 0.0f;
+                }
 
                 /* Monta as mensagens JSON. */
                 snprintf(
