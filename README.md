@@ -14,9 +14,9 @@ A montagem descrita para este caso de uso contempla:
 |---|---|---|
 | DHT22 / AM2301 | Temperatura e umidade relativa do ar | Comunicação digital; GPIO 21 na configuração documentada |
 | MQ-135 | Sinal relacionado à qualidade do ar | Saída analógica conectada ao GPIO 34 (ADC1_CH6); conversão em concentração depende da calibração |
-| LDR | Intensidade luminosa relativa | Leitura analógica usada como indicação de luminosidade |
 
-As leituras do MQ-135 não devem ser tratadas como medição laboratorial precisa de um gás específico sem calibração e validação adequadas. O LDR também fornece uma indicação relativa, salvo se houver calibração fotométrica.
+
+As leituras do MQ-135 não devem ser tratadas como medição laboratorial precisa de um gás específico sem calibração e validação adequadas.
 
 ## Fluxo de funcionamento
 
